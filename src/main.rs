@@ -1,7 +1,13 @@
+use std::{env, net};
+
 use hyper::{
-  rt::Future as Promise, service::service_fn, Body, Error as HyperError, Method, Request, Response,
-  Server, StatusCode,
+  rt::{run, Future as Promise},
+  service::service_fn,
+  Body, Error as HyperError, Method, Request, Response, Server, StatusCode,
 };
+
+use log::{error, info};
+use pretty_env_logger;
 
 use futures::{future as promiseFn, Stream};
 
@@ -46,9 +52,14 @@ fn app(req: Request<Body>) -> BoxedPromise {
 }
 
 fn main() {
-  let address: std::net::SocketAddr = ([127, 0, 0, 1], 3000).into();
-  let server = Server::bind(&address)
+  env::set_var("RUST_LOG", "url_shortener=info");
+  pretty_env_logger::init();
+
+  let address: net::SocketAddr = ([127, 0, 0, 1], 3000).into();
+  let server_promise = Server::bind(&address)
     .serve(|| service_fn(app))
-    .map_err(|e| eprintln!("server error: {}", e));
-  hyper::rt::run(server);
+    .map_err(|e| error!("server error: {}", e));
+
+  info!("URL shortener listening on: {}", address);
+  run(server_promise);
 }
