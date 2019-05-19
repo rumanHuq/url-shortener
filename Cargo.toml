@@ -1,0 +1,9 @@
+[package]
+name = "url-shortener"
+version = "0.1.0"
+authors = ["Majedul Hoque <rumanbsl@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+hyper="0.12.29"
+futures="0.1.27"
