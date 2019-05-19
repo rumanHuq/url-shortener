@@ -1,4 +1,4 @@
-use std::{env, net};
+use std::{env, net, str, sync::{Arc,RwLock}, collections::HashMap};
 
 use hyper::{
   rt::{run, Future as Promise},
@@ -10,10 +10,20 @@ use log::{error, info};
 use pretty_env_logger;
 
 use futures::{future as promiseFn, Stream};
+mod shortener;
+use shortener::get_shortend_url;
+use lazy_static::lazy_static;
 
 type Resolve = Response<Body>;
 type Reject = HyperError;
 type BoxedPromise = Box<Promise<Item = Resolve, Error = Reject> + Send>;
+
+
+type UrlDb=Arc<RwLock<HashMap<String, String>>>;
+
+lazy_static! {
+  static ref SHORT_URLS: UrlDb = Arc::new(RwLock::new(HashMap::new()));
+}
 
 fn app(req: Request<Body>) -> BoxedPromise {
   let mut response = Response::new(Body::empty());
@@ -42,6 +52,21 @@ fn app(req: Request<Body>) -> BoxedPromise {
         response
       });
       return Box::new(reversed);
+    }
+    (&Method::POST, "/url-shorten") =>{
+     let response = req.into_body().concat2().map(move |chunk|{
+       let cloned_chunk:Vec<u8> = chunk.iter().cloned().collect();
+       let url_to_shorten = str::from_utf8(&cloned_chunk).unwrap();
+       let shortened_url = get_shortend_url(url_to_shorten);
+       SHORT_URLS.write().unwrap().insert(shortened_url, url_to_shorten.to_string());
+       let body = &*SHORT_URLS.read().unwrap();
+       if let Some(url) = body.keys().nth(0) {
+        Response::new(Body::from(format!("http://127.0.0.1:3000/{}", url)))
+       } else {
+        Response::new(Body::from(format!("{:#?}", body)))
+       }
+     }); 
+     return Box::new(response);
     }
     _ => {
       *response.status_mut() = StatusCode::NOT_FOUND;
